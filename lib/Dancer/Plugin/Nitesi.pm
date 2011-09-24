@@ -18,11 +18,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0002
+Version 0.0003
 
 =cut
 
-our $VERSION = '0.0002';
+our $VERSION = '0.0003';
 
 =head1 SYNOPSIS
 
@@ -44,6 +44,32 @@ You can use multiple carts like that:
     cart('wishlist')->add({sku => 'ABC', name => 'Foobar', quantity => 1, price => 42});
     cart('wishlist')->total;
 
+=head1 HOOKS
+
+This plugin installs the following hooks:
+
+=over 4
+
+=item before_cart_add
+
+Triggered before item is added to the cart.
+
+=item after_cart_add
+
+Triggered after item is added to the cart.
+Used by DBI backend to save item to the database.
+
+=item before_cart_remove
+
+Triggered before item is removed from the cart.
+
+=item after_cart_remove
+
+Triggered after item is removed from the cart.
+Used by DBI backend to delete item from the database.
+
+=back
+
 =head1 CONFIGURATION
 
 The default configuration is as follows:
@@ -59,7 +85,9 @@ The default configuration is as follows:
 
 =cut
 
-Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add after_cart_add/);
+Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add after_cart_add
+	before_cart_remove after_cart_remove
+/);
 
 my $settings = undef;
 
@@ -84,7 +112,9 @@ after sub {
     }
 };
 
-register account => sub {
+register account => \&_account;
+
+sub _account {
     my $acct;
 
     unless (vars->{'nitesi_account'}) {
@@ -136,13 +166,18 @@ sub _load_account_providers {
 
 sub _create_cart {
     my $name = shift;
-    my ($backend, $backend_class, $cart);
+    my ($backend, $backend_class, $cart, $cart_settings);
 
     if (exists $settings->{Cart}->{Backend}) {
 	$backend = $settings->{Cart}->{Backend};
     }
     else {
 	$backend = 'Session';
+    }
+
+    # check for specific settings for this cart name
+    if (exists $settings->{Cart}->{Carts}->{$name}) {
+	$cart_settings = $settings->{Cart}->{Carts}->{$name};
     }
 
     # determine backend class name
@@ -155,9 +190,10 @@ sub _create_cart {
 
     $cart = Nitesi::Class->instantiate($backend_class,
 				       name => $name,
+                                       settings => $cart_settings,
 				       run_hooks => sub {Dancer::Factory::Hook->instance->execute_hooks(@_)});
 
-    $cart->load();
+    $cart->load(uid => _account()->uid);
 
     return $cart;
 }
