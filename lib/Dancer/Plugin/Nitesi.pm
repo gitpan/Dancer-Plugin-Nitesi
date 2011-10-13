@@ -7,6 +7,7 @@ use warnings;
 use Nitesi::Account::Manager;
 use Nitesi::Cart;
 use Nitesi::Class;
+use Nitesi::Query::DBI;
 
 use Dancer ':syntax';
 use Dancer::Plugin;
@@ -18,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0003
+Version 0.0010
 
 =cut
 
-our $VERSION = '0.0003';
+our $VERSION = '0.0010';
 
 =head1 SYNOPSIS
 
@@ -78,10 +79,34 @@ The default configuration is as follows:
       Nitesi:
         Account:
           Session:
-          Key: account
-        Provider: DBI
+            Key: account
+          Provider: DBI
       Cart:
         Backend: Session
+
+=head2 ACCOUNT
+
+=head3 Connection
+
+The connection used by L<Dancer::Plugin::Database> can be set
+as follows:
+
+    plugins:
+      Nitesi:
+        Account:
+          Provider: DBI
+          Connection: shop
+
+=head3 Fields
+
+Extra fields can be retrieved from the account provider and
+put into the session after a successful login:
+
+    plugins:
+      Nitesi:
+        Account:
+          Provider: DBI
+          Fields: first_name,last_name,city
 
 =cut
 
@@ -147,6 +172,25 @@ register cart => sub {
     return vars->{'nitesi_carts'}->{$name};
 };
 
+register query => sub {
+    my ($name, $q);
+
+    if (@_) {
+	$name = shift;
+    }
+    else {
+	$name = '';
+    }
+
+    unless (exists vars->{'nitesi_query'}->{$name}) {
+	# not yet used in this request
+	$q = Nitesi::Query::DBI->new(dbh => database());
+	vars->{'nitesi_query'}->{$name} = $q;
+    }
+
+    return vars->{nitesi_query}->{$name};
+};
+
 register_plugin;
 
 sub _load_settings {
@@ -159,9 +203,23 @@ sub _load_account_providers {
 	if ($settings->{Account}->{Provider} eq 'DBI') {
 	    # we need to pass $dbh
 	    return [['Nitesi::Account::Provider::DBI',
-		     dbh => database()]];
+		     dbh => database($settings->{Account}->{Connection}),
+		     fields => _config_to_array($settings->{Account}->{Fields}),
+		    ]];
 	}
     }
+}
+
+sub _config_to_array {
+    my $config = shift;
+    my @values;
+
+    if (defined $config) {
+	@values = split(/\s+,\s+/, $config);
+	return \@values;
+    }
+
+    return;
 }
 
 sub _create_cart {
@@ -204,6 +262,8 @@ sub _update_session {
 
     # determine session key
     $key = $settings->{Account}->{Session}->{Key} || 'user';
+
+    $function ||= '';
 
     if ($function eq 'init') {
 	# initialize user related information
