@@ -19,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0010
+Version 0.0011
 
 =cut
 
-our $VERSION = '0.0010';
+our $VERSION = '0.0011';
 
 =head1 SYNOPSIS
 
@@ -110,7 +110,9 @@ put into the session after a successful login:
 
 =cut
 
-Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add after_cart_add
+Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add_validate
+        before_cart_add after_cart_add
+        before_cart_remove_validate
 	before_cart_remove after_cart_remove
 /);
 
@@ -219,7 +221,7 @@ sub _config_to_array {
 	return \@values;
     }
 
-    return;
+    return [];
 }
 
 sub _create_cart {
