@@ -19,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0012
+Version 0.0020
 
 =cut
 
-our $VERSION = '0.0012';
+our $VERSION = '0.0020';
 
 =head1 SYNOPSIS
 
@@ -44,6 +44,11 @@ You can use multiple carts like that:
 
     cart('wishlist')->add({sku => 'ABC', name => 'Foobar', quantity => 1, price => 42});
     cart('wishlist')->total;
+
+The DBI backend (L<Dancer::Plugin::Nitesi::Cart::DBI>) allows you to load carts
+of arbitrary users.
+
+    cart('', 123)->items;
 
 =head1 HOOKS
 
@@ -157,21 +162,24 @@ sub _account {
 };
 
 register cart => sub {
-    my $name;
+    my ($name, $id, $token);
 
-    if (@_) {
+    if (@_ >= 1) {
 	$name = shift;
+	$id = shift;
+	$token = "$name\0$id";
     }
     else {
 	$name = 'main';
+	$token = $name;
     }
 
-    unless (exists vars->{nitesi_carts}->{$name}) {
+    unless (exists vars->{nitesi_carts}->{$token}) {
 	# instantiate cart
-	vars->{nitesi_carts}->{$name} = _create_cart($name);
+	vars->{nitesi_carts}->{$token} = _create_cart($name, $id);
     }
 
-    return vars->{'nitesi_carts'}->{$name};
+    return vars->{'nitesi_carts'}->{$token};
 };
 
 register query => sub {
@@ -217,7 +225,7 @@ sub _config_to_array {
     my @values;
 
     if (defined $config) {
-	@values = split(/\s+,\s+/, $config);
+	@values = split(/\s*,\s*/, $config);
 	return \@values;
     }
 
@@ -225,7 +233,7 @@ sub _config_to_array {
 }
 
 sub _create_cart {
-    my $name = shift;
+    my ($name, $id) = @_;
     my ($backend, $backend_class, $cart, $cart_settings);
 
     if (exists $settings->{Cart}->{Backend}) {
@@ -253,7 +261,14 @@ sub _create_cart {
                                        settings => $cart_settings,
 				       run_hooks => sub {Dancer::Factory::Hook->instance->execute_hooks(@_)});
 
-    $cart->load(uid => _account()->uid);
+    if ($id && $name eq 'id') {
+	# load cart by cart code
+	$cart->load_by_id($id)
+    }
+    else {
+	# load cart by name and uid
+	$cart->load(uid => $id || _account()->uid);
+    }
 
     return $cart;
 }
