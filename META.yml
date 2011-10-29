@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Dancer-Plugin-Nitesi
-version:            0.0020
+version:            0.0030
 abstract:           Dancer Plugin for Nitesi Open Source Shop Machine
 author:
     - Stefan Hornburg (Racke) <racke@linuxia.de>
@@ -13,7 +13,7 @@ build_requires:
 requires:
     Dancer:               1.3071
     Dancer::Plugin::Database:  0
-    Nitesi:               0.002
+    Nitesi:               0.003
     Nitesi::DBI:          0.002
     Test::More:           0
     YAML:                 0

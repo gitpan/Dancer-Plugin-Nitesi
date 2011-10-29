@@ -19,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0020
+Version 0.0030
 
 =cut
 
-our $VERSION = '0.0020';
+our $VERSION = '0.0030';
 
 =head1 SYNOPSIS
 
@@ -126,14 +126,14 @@ my $settings = undef;
 my %acct_providers;
 my %carts;
 
-before sub {
+hook 'before' => sub {
     # find out which backend we are using
     my ($backend, $backend_class, $backend_obj);
 
     _load_settings() unless $settings;
 };
 
-after sub {
+hook 'after' => sub {
     my $carts;
 
     # save all carts
@@ -164,10 +164,14 @@ sub _account {
 register cart => sub {
     my ($name, $id, $token);
 
-    if (@_ >= 1) {
-	$name = shift;
+    if (@_ > 1) {
+	$name = shift || 'main';
 	$id = shift;
 	$token = "$name\0$id";
+    }
+    elsif (@_ == 1) {
+	$name = shift || 'main';
+	$token = $name;
     }
     else {
 	$name = 'main';
@@ -261,14 +265,7 @@ sub _create_cart {
                                        settings => $cart_settings,
 				       run_hooks => sub {Dancer::Factory::Hook->instance->execute_hooks(@_)});
 
-    if ($id && $name eq 'id') {
-	# load cart by cart code
-	$cart->load_by_id($id)
-    }
-    else {
-	# load cart by name and uid
-	$cart->load(uid => $id || _account()->uid);
-    }
+    $cart->load(uid => $id || _account()->uid);
 
     return $cart;
 }

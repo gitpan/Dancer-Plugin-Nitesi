@@ -59,31 +59,17 @@ sub load {
     }
     $self->{id} = $code;
 
-    $self->_populate;
-}
+    # build query for item retrieval
+    %specs = (fields => $self->{settings}->{fields} || 
+	      [qw/products.sku products.name cart_products.quantity/],
+	      join => $self->{settings}->{join} ||
+	      [qw/carts code=cart cart_products sku=sku products/],
+	      where => {'carts.name' => $self->name, uid => $uid});	      
 
-=head2 load_by_id
+    # retrieve items from database
+    $result = $self->{sqla}->select(%specs);
 
-Loads cart from database by specifying identifier.
-
-=cut
-
-sub load_by_id {
-    my ($self, $id) = @_;
-    my ($name);
-
-    # determine cart name
-    $name = $self->{sqla}->select_field(table => 'carts', field => 'code', where => {code => $id});
-
-    unless ($name) {
-	$self->{id} = 0;
-	return;
-    }
-
-    $self->{id} = $id;
-    $self->{name} = $name;
-
-    $self->_populate;
+    $self->seed($result);
 }
 
 =head2 save
@@ -96,29 +82,17 @@ sub save {
     return 1;
 }
 
-sub _populate {
-    my ($self, %specs, $result);
-
-    $self = shift;
-
-    # build query for item retrieval
-    %specs = (fields => $self->{settings}->{fields} || 
-	      [qw/products.sku products.name cart_products.quantity/],
-	      join => $self->{settings}->{join} ||
-	      [qw/carts code=cart cart_products sku=sku products/],
-	      where => {'carts.code' => $self->{id}});	      
-
-    # retrieve items from database
-    $result = $self->{sqla}->select(%specs);
-
-    $self->seed($result);
-}
-
 sub _after_cart_add {
     my ($self, @args) = @_;
-    my ($item, $record);
+    my ($item, $update, $record);
+
+    unless ($self eq $args[0]) {
+	# not our cart
+	return;
+    }
 
     $item = $args[1];
+    $update = $args[2];
 
     unless ($self->{code}) {
 	# need to create cart first
@@ -130,19 +104,30 @@ sub _after_cart_add {
 						    where => {name => $self->name, uid => $self->{uid}});
     }
 
-    # add new item to database
-    $record = {cart => $self->{code}, sku => $item->{sku}, quantity => $item->{quantity}, position => 0};
-   
-    $self->{sqla}->insert('cart_products', $record);
+    if ($update) {
+	# update item in database
+	$record = {quantity => $item->{quantity}};
+	$self->{sqla}->update('cart_products', $record, {cart => $self->{code}, sku => $item->{sku}});
+    }
+    else {
+	# add new item to database
+	$record = {cart => $self->{code}, sku => $item->{sku}, quantity => $item->{quantity}, position => 0};
+	$self->{sqla}->insert('cart_products', $record);
+    }
 }
 
 sub _after_cart_remove {
     my ($self, @args) = @_;
     my ($item);
 
+    unless ($self eq $args[0]) {
+	# not our cart
+	return;
+    }
+
     $item = $args[1];
 
-    $self->{sqla}->delete('cart_products', {cart => $self->{code}, sku => $item->{sku}});
+    $self->{sqla}->delete('cart_products', {cart => $self->{id}, sku => $item->{sku}});
 }
 
 =head1 AUTHOR
