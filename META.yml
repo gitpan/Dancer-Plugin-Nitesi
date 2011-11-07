@@ -1,27 +1,27 @@
---- #YAML:1.0
-name:               Dancer-Plugin-Nitesi
-version:            0.0030
-abstract:           Dancer Plugin for Nitesi Open Source Shop Machine
+---
+abstract: 'Dancer Plugin for Nitesi Open Source Shop Machine'
 author:
-    - Stefan Hornburg (Racke) <racke@linuxia.de>
-license:            perl
-distribution_type:  module
-configure_requires:
-    ExtUtils::MakeMaker:  0
+  - 'Stefan Hornburg (Racke) <racke@linuxia.de>'
 build_requires:
-    ExtUtils::MakeMaker:  0
-requires:
-    Dancer:               1.3071
-    Dancer::Plugin::Database:  0
-    Nitesi:               0.003
-    Nitesi::DBI:          0.002
-    Test::More:           0
-    YAML:                 0
-no_index:
-    directory:
-        - t
-        - inc
-generated_by:       ExtUtils::MakeMaker version 6.56
+  ExtUtils::MakeMaker: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.112150'
+license: perl
 meta-spec:
-    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
-    version:  1.4
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Dancer-Plugin-Nitesi
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  Dancer: 1.3071
+  Dancer::Plugin::Database: 0
+  Nitesi: 0.0031
+  Nitesi::DBI: 0.0032
+  Test::More: 0
+  YAML: 0
+version: 0.0031

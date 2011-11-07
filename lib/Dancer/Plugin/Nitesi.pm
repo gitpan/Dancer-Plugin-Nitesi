@@ -19,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0030
+Version 0.0031
 
 =cut
 
-our $VERSION = '0.0030';
+our $VERSION = '0.0031';
 
 =head1 SYNOPSIS
 
@@ -31,6 +31,7 @@ our $VERSION = '0.0030';
 
     cart->add({sku => 'ABC', name => 'Foobar', quantity => 1, price => 42});
     cart->items();
+    cart->clear();
 
     account->login(username => 'frank@nitesi.com', password => 'nevairbe');
     account->acl(check => 'view_prices');
@@ -73,6 +74,22 @@ Triggered before item is removed from the cart.
 
 Triggered after item is removed from the cart.
 Used by DBI backend to delete item from the database.
+
+=item before_cart_clear
+
+Triggered before cart is cleared.
+
+=item after_cart_clear
+
+Triggered after cart is cleared.
+
+=item before_cart_rename
+
+Triggered before cart is renamed.
+
+=item after cart_rename
+
+Triggered after cart is renamed.
 
 =back
 
@@ -119,6 +136,8 @@ Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add_validate
         before_cart_add after_cart_add
         before_cart_remove_validate
 	before_cart_remove after_cart_remove
+        before_cart_rename after_cart_rename
+        before_cart_clear after_cart_clear
 /);
 
 my $settings = undef;
