@@ -19,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0031
+Version 0.0032
 
 =cut
 
-our $VERSION = '0.0031';
+our $VERSION = '0.0032';
 
 =head1 SYNOPSIS
 
@@ -50,6 +50,31 @@ The DBI backend (L<Dancer::Plugin::Nitesi::Cart::DBI>) allows you to load carts
 of arbitrary users.
 
     cart('', 123)->items;
+
+=head1 ACCOUNTS
+
+The account keyword returns a L<Nitesi::Account::Manager> object with the
+corresponding methods.
+
+Login to an account:
+
+    account->login(username => 'frank@nitesi.com', password => 'nevairbe');
+
+Logout:
+
+    account->logout();
+
+Check permissions:
+
+    account->acl(check => 'view_prices');
+
+Change password for current account:
+
+    account->password('nevairbe');
+
+Change password for other account:
+
+    account->password(username => 'frank@nitesi.com', password => 'nevairbe');
 
 =head1 HOOKS
 
@@ -238,6 +263,7 @@ sub _load_account_providers {
 	    return [['Nitesi::Account::Provider::DBI',
 		     dbh => database($settings->{Account}->{Connection}),
 		     fields => _config_to_array($settings->{Account}->{Fields}),
+		     inactive => $settings->{Account}->{inactive},
 		    ]];
 	}
     }
