@@ -19,11 +19,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0032
+Version 0.0050
 
 =cut
 
-our $VERSION = '0.0032';
+our $VERSION = '0.0050';
 
 =head1 SYNOPSIS
 
@@ -90,6 +90,15 @@ Triggered before item is added to the cart.
 
 Triggered after item is added to the cart.
 Used by DBI backend to save item to the database.
+
+=item before_cart_update
+
+Triggered before cart item is updated (changing quantity).
+
+=item after_cart_update
+
+Triggered after cart item is updated (changing quantity).
+Used by DBI backend to update item to the database.
 
 =item before_cart_remove
 
@@ -159,6 +168,7 @@ put into the session after a successful login:
 
 Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add_validate
         before_cart_add after_cart_add
+        before_cart_update after_cart_update
         before_cart_remove_validate
 	before_cart_remove after_cart_remove
         before_cart_rename after_cart_rename
@@ -169,13 +179,6 @@ my $settings = undef;
 
 my %acct_providers;
 my %carts;
-
-hook 'before' => sub {
-    # find out which backend we are using
-    my ($backend, $backend_class, $backend_obj);
-
-    _load_settings() unless $settings;
-};
 
 hook 'after' => sub {
     my $carts;
@@ -194,12 +197,12 @@ sub _account {
     my $acct;
 
     unless (vars->{'nitesi_account'}) {
-	# not yet used in this request
-	$acct = Nitesi::Account::Manager->instance(provider_sub => \&_load_account_providers, 
-						   session_sub => \&_update_session);
-	$acct->init_from_session;
+        # not yet used in this request
+        $acct = Nitesi::Account::Manager->new(provider_sub => \&_load_account_providers,
+                                              session_sub => \&_update_session);
+        $acct->init_from_session;
 
-	var nitesi_account => $acct;
+        var nitesi_account => $acct;
     }
 
     return vars->{'nitesi_account'};
@@ -208,17 +211,13 @@ sub _account {
 register cart => sub {
     my ($name, $id, $token);
 
-    if (@_ > 1) {
-	$name = shift || 'main';
-	$id = shift;
+    $name = shift || 'main';
+    $id = shift;
+
+    if (defined $id) {
 	$token = "$name\0$id";
     }
-    elsif (@_ == 1) {
-	$name = shift || 'main';
-	$token = $name;
-    }
     else {
-	$name = 'main';
 	$token = $name;
     }
 
@@ -231,19 +230,25 @@ register cart => sub {
 };
 
 register query => sub {
-    my ($name, $q);
+    my ($name, $arg, $q, $dbh);
 
     if (@_) {
-	$name = shift;
+        $name = shift;
+        $arg = $name;
     }
     else {
-	$name = '';
+        $name = '';
+        $arg = undef;
     }
-
+    
     unless (exists vars->{'nitesi_query'}->{$name}) {
-	# not yet used in this request
-	$q = Nitesi::Query::DBI->new(dbh => database());
-	vars->{'nitesi_query'}->{$name} = $q;
+        # not yet used in this request
+        unless ($dbh = database($arg)) {
+            die "No database handle for database '$name'";
+        }
+
+        $q = Nitesi::Query::DBI->new(dbh => $dbh);
+        vars->{'nitesi_query'}->{$name} = $q;
     }
 
     return vars->{nitesi_query}->{$name};
@@ -252,10 +257,12 @@ register query => sub {
 register_plugin;
 
 sub _load_settings {
-    $settings = plugin_setting;
+    $settings ||= plugin_setting;
 }
 
 sub _load_account_providers {
+    _load_settings();
+
     # setup account providers
     if (exists $settings->{Account}->{Provider}) {
 	if ($settings->{Account}->{Provider} eq 'DBI') {
@@ -285,6 +292,8 @@ sub _create_cart {
     my ($name, $id) = @_;
     my ($backend, $backend_class, $cart, $cart_settings);
 
+    _load_settings();
+
     if (exists $settings->{Cart}->{Backend}) {
 	$backend = $settings->{Cart}->{Backend};
     }
@@ -293,8 +302,35 @@ sub _create_cart {
     }
 
     # check for specific settings for this cart name
-    if (exists $settings->{Cart}->{Carts}->{$name}) {
-	$cart_settings = $settings->{Cart}->{Carts}->{$name};
+    if (exists $settings->{Cart}->{Carts}) {
+        my $sref = $settings->{Cart}->{Carts};
+
+        if (ref($sref) eq 'ARRAY') {
+            # walk through settings
+            for my $try (@$sref) {
+                if (exists $try->{name}
+                    && $name eq $try->{name}) {
+                    $cart_settings = $try;
+                    last;
+                }
+                if (exists $try->{match}) {
+                    my $match = qr/$try->{match}/;
+
+                    if ($name =~ /$match/) {
+                        $cart_settings = $try;
+                        last;
+                    }
+                }
+            }
+        }
+        elsif (ref($sref) eq 'HASH') {
+            if (exists $settings->{Cart}->{Carts}->{$name}) {
+                $cart_settings = $settings->{Cart}->{Carts}->{$name};
+            }
+        }
+        else {
+            die "Invalid cart settings.";
+        }
     }
 
     # determine backend class name
@@ -318,6 +354,8 @@ sub _create_cart {
 sub _update_session {
     my ($function, $acct) = @_;
     my ($key, $sref);
+
+    _load_settings();
 
     # determine session key
     $key = $settings->{Account}->{Session}->{Key} || 'user';
