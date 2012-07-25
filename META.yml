@@ -24,4 +24,4 @@ requires:
   Nitesi::DBI: 0.005
   Test::More: 0
   YAML: 0
-version: 0.0050
+version: 0.0051

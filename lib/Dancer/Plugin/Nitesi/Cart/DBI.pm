@@ -126,8 +126,9 @@ sub _load_cart {
                  [qw/products.sku products.name cart_products.quantity/],
                  join => $self->{settings}->{join} ||
                  [qw/carts code=cart cart_products sku=sku products/],
-                 where => {'carts.code' => $self->{id}},
-                 );
+                 where => {'carts.code' => $self->{id},
+                          '-not_bool' => 'inactive',
+                          });
 
     # retrieve items from database
     my $result = $self->{sqla}->select(%specs);
@@ -228,7 +229,7 @@ Stefan Hornburg (Racke), <racke@linuxia.de>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2011 Stefan Hornburg (Racke) <racke@linuxia.de>.
+Copyright 2011-2012 Stefan Hornburg (Racke) <racke@linuxia.de>.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published
