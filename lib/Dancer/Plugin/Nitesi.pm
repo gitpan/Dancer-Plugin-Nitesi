@@ -5,11 +5,14 @@ use strict;
 use warnings;
 
 use Nitesi::Account::Manager;
+use Nitesi::Product;
 use Nitesi::Cart;
 use Nitesi::Class;
 use Nitesi::Query::DBI;
 
-use Dancer ':syntax';
+use Moo::Role;
+
+use Dancer qw(:syntax !before !after);
 use Dancer::Plugin;
 use Dancer::Plugin::Database;
 
@@ -19,11 +22,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0051
+Version 0.0060
 
 =cut
 
-our $VERSION = '0.0051';
+our $VERSION = '0.0060';
 
 =head1 SYNOPSIS
 
@@ -36,6 +39,11 @@ our $VERSION = '0.0051';
     account->login(username => 'frank@nitesi.com', password => 'nevairbe');
     account->acl(check => 'view_prices');
     account->logout();
+
+=head1 DESCRIPTION
+
+This dancer plugin gives you access to the account and cart functions of
+the Nitesi shop machine.
 
 =head1 CARTS
 
@@ -75,6 +83,10 @@ Change password for current account:
 Change password for other account:
 
     account->password(username => 'frank@nitesi.com', password => 'nevairbe');
+
+Create account:
+
+    account->create(email => 'fina@nitesi.com');
 
 =head1 HOOKS
 
@@ -139,6 +151,10 @@ The default configuration is as follows:
           Provider: DBI
       Cart:
         Backend: Session
+      Product:
+        backend: DBI
+        table: products
+        key: sku
 
 =head2 ACCOUNT
 
@@ -166,14 +182,14 @@ put into the session after a successful login:
 
 =cut
 
-Dancer::Factory::Hook->instance->install_hooks(qw/before_cart_add_validate
-        before_cart_add after_cart_add
-        before_cart_update after_cart_update
-        before_cart_remove_validate
-	before_cart_remove after_cart_remove
-        before_cart_rename after_cart_rename
-        before_cart_clear after_cart_clear
-/);
+register_hook(qw/before_cart_add_validate
+                 before_cart_add after_cart_add
+                 before_cart_update after_cart_update
+                 before_cart_remove_validate
+                 before_cart_remove after_cart_remove
+                 before_cart_rename after_cart_rename
+                 before_cart_clear after_cart_clear
+                /);
 
 my $settings = undef;
 
@@ -206,6 +222,171 @@ sub _account {
     }
 
     return vars->{'nitesi_account'};
+};
+
+sub _api_object {
+    my (%args) = @_;
+    my ($api_class, $api_object, $settings_class, $backend, $sname, $provider,
+        $provider_settings, $o_settings, $backend_settings, @roles);
+
+    _load_settings();
+
+    $sname = ucfirst($args{name});
+
+    # determine backend
+    if ($args{backend}) {
+        $backend = $args{backend};
+    }
+    elsif (exists $settings->{$sname}->{providers}) {
+        if ($provider = $settings->{Product}->{default_provider}) {
+            $provider_settings =  $settings->{Product}->{providers}->{$provider};
+
+            $backend = $provider_settings->{backend} || 'DBI';
+        }
+    }
+    else {
+        $backend = 'DBI';
+    }
+
+    # check whether base class for this object is overridden in the settings
+    if (exists $settings->{$sname}->{class}) {
+        $api_class = $settings->{$sname}->{class};
+    }
+    else {
+        $api_class = $args{class};
+    }
+
+    # create API object
+    my (%api_info, $o_key);
+
+    $api_object = Nitesi::Class->instantiate($api_class,
+					     api_class => $api_class,
+					     api_name => $args{name});
+
+    unless ($api_object) {
+        die "Failed to create class $api_class: $@";
+    }
+
+    $api_info{$api_class} = $api_object->api_info;
+    $o_key = $api_info{$api_class}->{key};
+
+    # load Dancer settings for this backend
+    $settings_class = "Dancer::Plugin::Nitesi::Backend::$backend";
+
+    $o_settings = Nitesi::Class->instantiate($settings_class);
+    $backend_settings = $o_settings->params;
+
+    # load roles for this API object
+    for my $role_name (@{$args{roles} || []}) {
+        Nitesi::Class->load($role_name);
+        my $api_func = lc($role_name);
+        $api_func =~ s/^(.*)::([^:]+)$/$2/;
+        $api_func .= '_api_info';
+        $api_info{$role_name} = $role_name->$api_func;
+        push (@roles, $role_name);
+    }
+
+    # load backend class
+    my $backend_class = "Nitesi::Backend::$backend";
+    Nitesi::Class->load($backend_class);
+
+    # apply backend role to navigation object
+    my ($key, $value);
+
+    Moo::Role->apply_roles_to_object($api_object, @roles, $backend_class);
+
+    while (($key, $value) = each %$backend_settings) {
+        $api_object->$key($value);
+    }
+
+    if ($settings->{$sname}->{field_map}) {
+        $api_object->field_map($settings->{$sname}->{field_map});
+    }
+
+    $api_object->api_info(\%api_info);
+
+    if ($args{$o_key}) {
+        $api_object->$o_key($args{$o_key});
+    }
+
+    return $api_object;
+}
+
+register shop_address => sub {
+    my ($aid) = @_;
+    my ($address);
+
+    $address = _api_object(name => 'address',
+                           class => 'Nitesi::Address',
+                           aid => $aid,
+        );
+
+    return $address;
+};
+
+register shop_merchandising => sub {
+    my ($code) = @_;
+    my ($object);
+
+    $object = _api_object(name => 'merchandising',
+                          class => 'Nitesi::Merchandising',
+                          code => $code,
+        );
+
+    return $object;
+};
+
+register shop_transaction => sub {
+    my ($code) = @_;
+    my ($transaction);
+
+    $transaction = _api_object(name => 'transaction',
+                               class => 'Nitesi::Transaction',
+                               code => $code,
+        );
+
+    return $transaction;
+};
+
+register shop_navigation => sub {
+    my ($code) = @_;
+    my ($navigation);
+
+    $navigation = _api_object(name => 'navigation',
+                              class => 'Nitesi::Navigation',
+                              code => $code,
+        );
+
+    return $navigation;
+};
+
+register shop_product => sub {
+    my ($sku, $backend) = @_;
+    my (%api_params, $backend_params, $settings_class, $o_settings, $backend_class, $o_backend,
+	$provider, $provider_settings, $backend_settings);
+
+    %api_params = (name => 'product',
+                   class => 'Nitesi::Product',
+                   roles => ['Nitesi::Inventory'],
+        );
+
+    if (defined $sku) {
+        $api_params{sku} = $sku;
+    }
+
+    return _api_object(%api_params);
+};
+
+register shop_media => sub {
+    my ($code) = @_;
+    my ($object);
+     
+    $object = _api_object(name => 'media',
+                               class => 'Nitesi::Media',
+                               code => $code,
+        );
+    
+    return $object;
 };
 
 register cart => sub {
@@ -265,15 +446,31 @@ sub _load_account_providers {
 
     # setup account providers
     if (exists $settings->{Account}->{Provider}) {
-	if ($settings->{Account}->{Provider} eq 'DBI') {
-	    # we need to pass $dbh
-	    return [['Nitesi::Account::Provider::DBI',
-		     dbh => database($settings->{Account}->{Connection}),
-		     fields => _config_to_array($settings->{Account}->{Fields}),
-		     inactive => $settings->{Account}->{inactive},
-		    ]];
-	}
+        if ($settings->{Account}->{Provider} eq 'DBI') {
+            return [['Nitesi::Account::Provider::DBI',
+                     dbh => database($settings->{Account}->{Connection}),
+                     fields => _config_to_array($settings->{Account}->{Fields}),
+                     inactive => $settings->{Account}->{inactive},
+                    ]];
+        }
+        else {
+            my $provider_class = $settings->{Account}->{Provider};
+
+            unless ($provider_class =~ /::/) {
+                $provider_class = "Nitesi::Account::Provider::$provider_class";
+            }
+
+            my %account_init = %{$settings->{Account}};
+
+            delete $account_init{Provider};
+
+            return [[$provider_class, %account_init]];
+        }
     }
+
+    # DBI provider is the default
+    return [['Nitesi::Account::Provider::DBI',
+             dbh => database]];
 }
 
 sub _config_to_array {
@@ -344,7 +541,7 @@ sub _create_cart {
     $cart = Nitesi::Class->instantiate($backend_class,
 				       name => $name,
                                        settings => $cart_settings,
-				       run_hooks => sub {Dancer::Factory::Hook->instance->execute_hooks(@_)});
+				       run_hooks => sub {execute_hook(@_)});
 
     $cart->load(uid => $id || _account()->uid);
 

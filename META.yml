@@ -18,10 +18,10 @@ no_index:
     - t
     - inc
 requires:
-  Dancer: 1.3071
+  Dancer: 1.3098
   Dancer::Plugin::Database: 0
-  Nitesi: 0.005
-  Nitesi::DBI: 0.005
+  Nitesi: 0.0061
+  Nitesi::DBI: 0.006
   Test::More: 0
   YAML: 0
-version: 0.0051
+version: 0.0060
