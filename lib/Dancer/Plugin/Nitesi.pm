@@ -22,11 +22,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0060
+Version 0.0080
 
 =cut
 
-our $VERSION = '0.0060';
+our $VERSION = '0.0080';
 
 =head1 SYNOPSIS
 
@@ -42,8 +42,10 @@ our $VERSION = '0.0060';
 
 =head1 DESCRIPTION
 
-This dancer plugin gives you access to the account and cart functions of
-the Nitesi shop machine.
+This dancer plugin gives you access to the products, cart and account
+functions of the Nitesi shop machine.
+
+=head1 PRODUCTS
 
 =head1 CARTS
 
@@ -88,11 +90,37 @@ Create account:
 
     account->create(email => 'fina@nitesi.com');
 
+=head1 ROUTES
+
+Standard routes can be registered by including the L<Dancer::Plugin::Nitesi::Routes>
+module and calling C<shop_set_routes> at the B<end> of your main application module:
+
+    package MyShopApp;
+
+    use Dancer ':syntax';
+    use Dancer::Plugin::Nitesi;
+    use Dancer::Plugin::Nitesi::Routes;
+
+    ...
+
+    shop_setup_routes;
+
+    1;
+
 =head1 HOOKS
 
 This plugin installs the following hooks:
 
+=head2 Add to cart
+
+The functions registered for these hooks receive the cart object
+and the item to be added as parameters.
+
 =over 4
+
+=item before_cart_add_validate
+
+Triggered before item is validated for adding to the cart.
 
 =item before_cart_add
 
@@ -103,6 +131,15 @@ Triggered before item is added to the cart.
 Triggered after item is added to the cart.
 Used by DBI backend to save item to the database.
 
+=back
+
+=head2 Update cart
+
+The functions registered for these hooks receive the cart object,
+the current item in the cart and the updated item.
+
+=over 4
+
 =item before_cart_update
 
 Triggered before cart item is updated (changing quantity).
@@ -112,14 +149,36 @@ Triggered before cart item is updated (changing quantity).
 Triggered after cart item is updated (changing quantity).
 Used by DBI backend to update item to the database.
 
+=back
+
+=head2 Remove from cart
+
+The functions registered for these hooks receive the cart object
+and the item to be added as parameters.
+
+=over 4
+
+=item before_cart_remove_validate
+
+Triggered before item is validated for removal.
+Receives cart object and item SKU.
+
 =item before_cart_remove
 
 Triggered before item is removed from the cart.
+Receives cart object and item.
 
 =item after_cart_remove
 
 Triggered after item is removed from the cart.
 Used by DBI backend to delete item from the database.
+Receives cart object and item.
+
+=back
+
+=head2 Clear cart
+
+=over 4
 
 =item before_cart_clear
 
@@ -129,11 +188,20 @@ Triggered before cart is cleared.
 
 Triggered after cart is cleared.
 
+=back
+
+=head2 Rename cart
+
+The functions registered for these hooks receive the cart object,
+the old name and the new name.
+
+=over 4
+
 =item before_cart_rename
 
 Triggered before cart is renamed.
 
-=item after cart_rename
+=item after_cart_rename
 
 Triggered after cart is renamed.
 
@@ -149,12 +217,14 @@ The default configuration is as follows:
           Session:
             Key: account
           Provider: DBI
-      Cart:
-        Backend: Session
-      Product:
-        backend: DBI
-        table: products
-        key: sku
+        Cart:
+          Backend: Session
+        Product:
+          backend: DBI
+          table: products
+          key: sku
+        Query:
+          log: 0
 
 =head2 ACCOUNT
 
@@ -180,6 +250,32 @@ put into the session after a successful login:
           Provider: DBI
           Fields: first_name,last_name,city
 
+=head2 PRODUCTS
+
+If your products table slightly varies from our default
+schema in L<Nitesi::Database::Schema>, you can adjust
+this in your configuration:
+
+    plugins:
+      Nitesi:
+        Product:
+          attributes:
+            name: description
+            short_description: comment_short
+
+This directs Dancer::Plugin::Nitesi to use the description
+field instead of the name field and the comment_short
+field instead of the short_description field.
+
+=head2 QUERY
+
+DBI queries can be logged with debug level as follows:
+
+    plugins:
+      Nitesi:
+        Query:
+          log: 1
+
 =cut
 
 register_hook(qw/before_cart_add_validate
@@ -203,8 +299,12 @@ hook 'after' => sub {
     $carts = vars->{'nitesi_carts'} || {};
 
     for (keys %$carts) {
-	$carts->{$_}->save();
+        if ($carts->{$_}->last_modified) {
+            $carts->{$_}->save();
+        }
     }
+
+    return;
 };
 
 register account => \&_account;
@@ -261,7 +361,9 @@ sub _api_object {
 
     $api_object = Nitesi::Class->instantiate($api_class,
 					     api_class => $api_class,
-					     api_name => $args{name});
+					     api_name => $args{name},
+                         api_attributes => $settings->{$sname}->{attributes},
+                         );
 
     unless ($api_object) {
         die "Failed to create class $api_class: $@";
@@ -411,7 +513,7 @@ register cart => sub {
 };
 
 register query => sub {
-    my ($name, $arg, $q, $dbh);
+    my ($name, $arg, $q, $dbh, $debug);
 
     if (@_) {
         $name = shift;
@@ -424,11 +526,24 @@ register query => sub {
     
     unless (exists vars->{'nitesi_query'}->{$name}) {
         # not yet used in this request
-        unless ($dbh = database($arg)) {
-            die "No database handle for database '$name'";
+        if (ref($arg) && $arg->isa('DBI::db')) {
+            $dbh = $arg;
+        }
+        else {
+            unless ($dbh = database($arg)) {
+                die "No database handle for database '$name'";
+            }
         }
 
-        $q = Nitesi::Query::DBI->new(dbh => $dbh);
+        if ($settings->{Query}->{log}) {
+            $debug = sub {
+                my ($q, $vars, $args) = @_;
+
+                debug "Query: $q, variables: ", $vars, ", arguments: ", $args;
+            };
+        }
+
+        $q = Nitesi::Query::DBI->new(dbh => $dbh, log_queries => $debug);
         vars->{'nitesi_query'}->{$name} = $q;
     }
 

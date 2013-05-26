@@ -14,11 +14,16 @@ WriteMakefile(
     PREREQ_PM => {
         'Test::More' => 0,
         'YAML'       => 0,
-	'Nitesi'     => 0.0061,
-	'Nitesi::DBI' => 0.0060,
+	'Nitesi'     => 0.0080,
+	'Nitesi::DBI' => 0.0080,
         'Dancer'     => 1.3098,
 	'Dancer::Plugin::Database' => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Dancer-Plugin-Nitesi-*' },
+    META_MERGE        => {
+        resources => {
+            repository  => 'https://github.com/racke/Dancer-Plugin-Nitesi.git',
+        },
+    },
 );
