@@ -27,4 +27,4 @@ requires:
   YAML: 0
 resources:
   repository: https://github.com/racke/Dancer-Plugin-Nitesi.git
-version: 0.0090
+version: 0.0091
