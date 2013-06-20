@@ -22,11 +22,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0080
+Version 0.0090
 
 =cut
 
-our $VERSION = '0.0080';
+our $VERSION = '0.0090';
 
 =head1 SYNOPSIS
 
@@ -106,6 +106,24 @@ module and calling C<shop_set_routes> at the B<end> of your main application mod
     shop_setup_routes;
 
     1;
+
+=head2 VIEWS
+
+The following views (template files) are needed for your shopping cart
+application:
+
+=over 4
+
+=item product
+
+Product detail page, with product description, product price and
+"Add to cart" button.
+
+=item cart
+
+Cart page.
+
+=back
 
 =head1 HOOKS
 
@@ -327,7 +345,8 @@ sub _account {
 sub _api_object {
     my (%args) = @_;
     my ($api_class, $api_object, $settings_class, $backend, $sname, $provider,
-        $provider_settings, $o_settings, $backend_settings, @roles);
+        $provider_settings, $o_settings, $backend_settings, @roles,
+        @settings_args);
 
     _load_settings();
 
@@ -375,7 +394,11 @@ sub _api_object {
     # load Dancer settings for this backend
     $settings_class = "Dancer::Plugin::Nitesi::Backend::$backend";
 
-    $o_settings = Nitesi::Class->instantiate($settings_class);
+    if ($settings->{Query}->{log}) {
+        @settings_args = (log_queries => \&_query_debug);
+    }
+
+    $o_settings = Nitesi::Class->instantiate($settings_class, @settings_args);
     $backend_settings = $o_settings->params;
 
     # load roles for this API object
@@ -536,11 +559,7 @@ register query => sub {
         }
 
         if ($settings->{Query}->{log}) {
-            $debug = sub {
-                my ($q, $vars, $args) = @_;
-
-                debug "Query: $q, variables: ", $vars, ", arguments: ", $args;
-            };
+            $debug = \&_query_debug;
         }
 
         $q = Nitesi::Query::DBI->new(dbh => $dbh, log_queries => $debug);
@@ -556,14 +575,39 @@ sub _load_settings {
     $settings ||= plugin_setting;
 }
 
+sub _reset_settings_and_vars {
+    $settings = plugin_setting;
+    vars->{'nitesi_query'} = {};
+    vars->{'nitesi_carts'} = {};
+    vars->{'nitesi_account'} = undef;
+}
+
+sub _query_debug {
+    my ($q, $vars, $args) = @_;
+
+    debug "Query: $q, variables: ", $vars, ", arguments: ", $args;
+};
+
 sub _load_account_providers {
     _load_settings();
 
     # setup account providers
     if (exists $settings->{Account}->{Provider}) {
         if ($settings->{Account}->{Provider} eq 'DBI') {
+            my ($conn, $dbh);
+
+            $conn = $settings->{Account}->{Connection};
+
+            if (ref($conn) and $conn->isa('DBI::db')) {
+                # passing database handle directly, useful for testing
+                $dbh = $conn;
+            }
+            else {
+                $dbh = database($conn);
+            }
+
             return [['Nitesi::Account::Provider::DBI',
-                     dbh => database($settings->{Account}->{Connection}),
+                     dbh => $dbh,
                      fields => _config_to_array($settings->{Account}->{Fields}),
                      inactive => $settings->{Account}->{inactive},
                     ]];
@@ -751,7 +795,7 @@ and for their quick and competent support.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2010-2012 Stefan Hornburg (Racke).
+Copyright 2010-2013 Stefan Hornburg (Racke).
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

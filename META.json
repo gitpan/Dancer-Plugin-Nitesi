@@ -34,8 +34,9 @@
          "requires" : {
             "Dancer" : "1.3098",
             "Dancer::Plugin::Database" : "0",
-            "Nitesi" : "0.008",
-            "Nitesi::DBI" : "0.008",
+            "Nitesi" : "0.009",
+            "Nitesi::DBI" : "0.009",
+            "Test::Database" : "0",
             "Test::More" : "0",
             "YAML" : "0"
          }
@@ -47,5 +48,5 @@
          "url" : "https://github.com/racke/Dancer-Plugin-Nitesi.git"
       }
    },
-   "version" : "0.0080"
+   "version" : "0.0090"
 }
