@@ -22,11 +22,11 @@ Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0091
+Version 0.0092
 
 =cut
 
-our $VERSION = '0.0091';
+our $VERSION = '0.0092';
 
 =head1 SYNOPSIS
 
@@ -537,6 +537,8 @@ register cart => sub {
 
 register query => sub {
     my ($name, $arg, $q, $dbh, $debug);
+
+    _load_settings();
 
     if (@_) {
         $name = shift;
