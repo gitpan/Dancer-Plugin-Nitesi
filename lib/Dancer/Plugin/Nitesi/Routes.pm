@@ -4,6 +4,7 @@ use Dancer ':syntax';
 use Dancer::Plugin;
 use Dancer::Plugin::Nitesi;
 use Dancer::Plugin::Nitesi::Routes::Cart;
+use Dancer::Plugin::Nitesi::Routes::Checkout;
 
 =head1 NAME
 
@@ -17,6 +18,10 @@ The template for each route type can be configured:
       Nitesi::Routes:
         cart:
           template: cart
+        checkout:
+          template: checkout
+        navigation:
+          template: listing
         product:
           template: product
 
@@ -31,6 +36,8 @@ register shop_setup_routes => sub {
 register_plugin;
 
 our %route_defaults = (cart => {template => 'cart'},
+                       checkout => {template => 'checkout'},
+                       navigation => {template => 'listing'},
                        product => {template => 'product'});
 
 sub _setup_routes {
@@ -43,6 +50,11 @@ sub _setup_routes {
     my $cart_sub = Dancer::Plugin::Nitesi::Routes::Cart::cart_route($routes_config);
     get '/cart' => $cart_sub;
     post '/cart' => $cart_sub;
+
+    # routes for checkout
+    my $checkout_sub = Dancer::Plugin::Nitesi::Routes::Checkout::checkout_route($routes_config);
+    get '/checkout' => $checkout_sub;
+    post '/checkout' => $checkout_sub;
 
     # fallback route for flypage and navigation
     get qr{/(?<path>.*)} => sub {
@@ -57,21 +69,24 @@ sub _setup_routes {
         }
 
         if (@$product_result == 1) {
-            $product = Nitesi::Product->new($product_result->[0]);
+            $product = shop_product($product_result->[0]->{sku})->load;
         }
         else {
             # check for a matching product by sku
-            unless ($product = shop_product($path)->load) {
-                status 'not_found';
-                return forward 404;
-            }
+            $product = shop_product($path);
 
-            if ($product->uri
-                && $product->uri ne $path) {
-                # permanent redirect to specific URL
-                debug "Redirecting permanently to product uri ", $product->uri,
-                    " for $path.";
-                return redirect(uri_for($product->uri), 301);
+            if ($product->load) {
+                if ($product->uri
+                    && $product->uri ne $path) {
+                    # permanent redirect to specific URL
+                    debug "Redirecting permanently to product uri ", $product->uri,
+                        " for $path.";
+                    return redirect(uri_for($product->uri), 301);
+                }
+            }
+            else {
+                # no matching product found
+                undef $product;
             }
         }
 
@@ -100,9 +115,10 @@ sub _setup_routes {
 
             my $products = [map {shop_product($_)->dump} @$pkeys];
 
-            return template 'listing', {%{$result->[0]},
-                                        products => $products,
-                                       };
+            return template $routes_config->{navigation}->{template},
+                {%{$result->[0]}, 
+                 products => $products,
+                };
         }
 
         # display not_found page
