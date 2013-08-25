@@ -16,17 +16,19 @@ use Dancer qw(:syntax !before !after);
 use Dancer::Plugin;
 use Dancer::Plugin::Database;
 
+use Dancer::Plugin::Nitesi::Business::OnlinePayment;
+
 =head1 NAME
 
 Dancer::Plugin::Nitesi - Nitesi Shop Machine plugin for Dancer
 
 =head1 VERSION
 
-Version 0.0093
+Version 0.0094
 
 =cut
 
-our $VERSION = '0.0093';
+our $VERSION = '0.0094';
 
 =head1 SYNOPSIS
 
@@ -60,6 +62,19 @@ The DBI backend (L<Dancer::Plugin::Nitesi::Cart::DBI>) allows you to load carts
 of arbitrary users.
 
     cart('', 123)->items;
+
+=head1 PAYMENT
+
+Card payments can be processed by one of the various providers
+supported by L<Business::OnlinePayment> with the charge keyword.
+
+    $tx = charge(provider => 'Braintree',
+                 amount => cart->total,
+                 first_name => 'Test',
+                 last_name => 'Tester',
+                 card_number => '4111111111111111',
+                 expiration => '0714',
+                 cvc => '222');
 
 =head1 ACCOUNTS
 
@@ -533,6 +548,35 @@ register cart => sub {
     }
 
     return vars->{'nitesi_carts'}->{$token};
+};
+
+register charge => sub {
+	my (%args) = @_;
+	my ($bop_nitesi, $payment_settings, $provider, $provider_settings);
+
+    _load_settings();
+
+	$payment_settings = $settings->{Payment};
+
+    # determine payment provider
+    if (exists $args{provider} && $args{provider}) {
+        $provider = $args{provider};
+    }
+    else {
+        $provider = $payment_settings->{default_provider};
+    }
+
+    debug "Payment settings: ", $payment_settings;
+
+    $provider_settings = $payment_settings->{providers}->{$provider};
+
+    # create BOP object wrapper with provider settings
+	$bop_nitesi = Dancer::Plugin::Nitesi::Business::OnlinePayment->new($provider, %$provider_settings);
+
+    # call charge method
+    $bop_nitesi->charge(%args);
+
+	return $bop_nitesi;
 };
 
 register query => sub {
