@@ -36,9 +36,16 @@ passed to the templates:
 
 =item before_product_display
 
+The hook sub receives the product data as hash reference.
+
 =item before_cart_display
 
 =item before_checkout_display
+
+=item before_navigation_display
+
+The hook sub receives the navigation data as hash reference.
+The list of products is the value of the C<products> key.
 
 =back
 
@@ -48,8 +55,7 @@ register shop_setup_routes => sub {
     _setup_routes();
 };
 
-register_hook 'before_product_display';
-
+register_hook (qw/before_product_display before_navigation_display/);
 register_plugin;
 
 our %route_defaults = (cart => {template => 'cart'},
@@ -133,10 +139,13 @@ sub _setup_routes {
 
             my $products = [map {shop_product($_)->dump} @$pkeys];
 
-            return template $routes_config->{navigation}->{template},
-                {%{$result->[0]}, 
-                 products => $products,
-                };
+            my $tokens = {%{$result->[0]},
+                          products => $products,
+                         };
+
+            execute_hook('before_navigation_display', $tokens);
+
+            return template $routes_config->{navigation}->{template}, $tokens;
         }
 
         # display not_found page
