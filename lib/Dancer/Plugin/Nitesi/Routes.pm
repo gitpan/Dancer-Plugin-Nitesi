@@ -10,6 +10,31 @@ use Dancer::Plugin::Nitesi::Routes::Checkout;
 
 Dancer::Plugin::Nitesi::Routes - Routes for Nitesi Shop Machine
 
+=head2 ROUTES
+
+The following routes are automatically created by this plugin:
+
+=over 4
+
+=item cart (C</cart>)
+
+Route for displaying and updating the cart.
+
+=item checkout (C</checkout>)
+
+Route for the checkout process.
+
+=item navigation
+
+Route for displaying navigation pages, for example
+categories and menus.
+
+=item product
+
+Route for displaying products.
+
+=back
+
 =head2 CONFIGURATION
 
 The template for each route type can be configured:
@@ -135,17 +160,20 @@ sub _setup_routes {
 
         if (@$result == 1) {
             # navigation item found
+
+            my $nav = $result->[0];
+
             my $pkeys = shop_navigation($result->[0]->{code})->assigned(shop_product);
 
-            my $products = [map {shop_product($_)->dump} @$pkeys];
+            my $products = [grep {! $_->{inactive}} map {shop_product($_)->dump} @$pkeys];
 
-            my $tokens = {%{$result->[0]},
+            my $tokens = {navigation => $nav,
                           products => $products,
                          };
 
             execute_hook('before_navigation_display', $tokens);
 
-            return template $routes_config->{navigation}->{template}, $tokens;
+            return template $nav->template || $routes_config->{navigation}->{template}, $tokens;
         }
 
         # display not_found page
@@ -156,13 +184,19 @@ sub _setup_routes {
 
 sub _config_routes {
     my ($settings, $defaults) = @_;
-    my ($key, $vref, $name, $value);
+    my ($key, $vref, $name, $value, $set_value);
+
+    unless (ref($defaults)) {
+        return;
+    }
 
     while (($key, $vref) = each %$defaults) {
-        while (($name, $value) = each %$vref) {
-            unless (exists $settings->{$key}->{$name}) {
-                $settings->{$key}->{$name} = $value;
-            }
+        if (exists $settings->{$key}) {
+            # recurse
+            _config_routes($settings->{$key}, $defaults->{$key});
+        }
+         else {
+            $settings->{$key} = $defaults->{$key};
         }
     }
 

@@ -7,7 +7,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
-generated_by: 'ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.120921'
+generated_by: 'ExtUtils::MakeMaker version 6.76, CPAN::Meta::Converter version 2.132510'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -21,11 +21,11 @@ requires:
   Business::OnlinePayment: 3.02
   Dancer: 1.3098
   Dancer::Plugin::Database: 0
-  Nitesi: 0.009
-  Nitesi::DBI: 0.0091
+  Nitesi: 0.0092
+  Nitesi::DBI: 0.0092
   Test::Database: 0
   Test::More: 0
   YAML: 0
 resources:
   repository: https://github.com/racke/Dancer-Plugin-Nitesi.git
-version: 0.0097
+version: 0.0098
