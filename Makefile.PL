@@ -15,7 +15,7 @@ WriteMakefile(
         'Test::More' => 0,
         'Test::Database' => 0,
         'YAML'       => 0,
-	'Nitesi'     => 0.0092,
+	'Nitesi'     => 0.0093,
 	'Nitesi::DBI' => 0.0092,
         'Dancer'     => 1.3098,
 	'Dancer::Plugin::Database' => 0,
@@ -25,7 +25,8 @@ WriteMakefile(
     clean               => { FILES => 'Dancer-Plugin-Nitesi-*' },
     META_MERGE        => {
         resources => {
-            repository  => 'https://github.com/racke/Dancer-Plugin-Nitesi.git',
+            repository  => 'https://github.com/interchange/Dancer-Plugin-Nitesi.git',
+            bugtracker => 'https://github.com/interchange/Dancer-Plugin-Nitesi/issues'
         },
     },
 );

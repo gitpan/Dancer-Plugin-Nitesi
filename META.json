@@ -4,7 +4,7 @@
       "Stefan Hornburg (Racke) <racke@linuxia.de>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.76, CPAN::Meta::Converter version 2.132510",
+   "generated_by" : "ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.120921",
    "license" : [
       "perl_5"
    ],
@@ -35,7 +35,7 @@
             "Business::OnlinePayment" : "3.02",
             "Dancer" : "1.3098",
             "Dancer::Plugin::Database" : "0",
-            "Nitesi" : "0.0092",
+            "Nitesi" : "0.0093",
             "Nitesi::DBI" : "0.0092",
             "Test::Database" : "0",
             "Test::More" : "0",
@@ -45,9 +45,12 @@
    },
    "release_status" : "stable",
    "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/interchange/Dancer-Plugin-Nitesi/issues"
+      },
       "repository" : {
-         "url" : "https://github.com/racke/Dancer-Plugin-Nitesi.git"
+         "url" : "https://github.com/interchange/Dancer-Plugin-Nitesi.git"
       }
    },
-   "version" : "0.0098"
+   "version" : "0.0099"
 }
